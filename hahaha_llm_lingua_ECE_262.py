@@ -185,6 +185,7 @@ def evaluate(data, compression_func, ratio=None):
     peak_memory_usages = []
     
     for idx in range(10):  # Test on 10 examples
+    #for idx in range(len(data)):
         example = data[idx] 
         #print(type(example))
         #print(example)
