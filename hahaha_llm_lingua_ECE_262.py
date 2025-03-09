@@ -182,6 +182,7 @@ def evaluate(data, compression_func, ratio=None):
     f1_scores = []
     latencies = []
     memory_usages = []
+    peak_memory_usages = []
     
     for idx in range(10):  # Test on 10 examples
         example = data[idx] 
@@ -204,6 +205,7 @@ def evaluate(data, compression_func, ratio=None):
         # print(test_response)  # Should return "Paris"
             
         prompt = f"Context: {compressed_context}\nQuestion: {question}"
+        torch.cuda.reset_peak_memory_stats()
         start_time = time.time()
         response, _ = model.chat(tokenizer, prompt)
         latency = time.time() - start_time
@@ -211,12 +213,16 @@ def evaluate(data, compression_func, ratio=None):
         # Measure memory
         memory = torch.cuda.memory_allocated() / (1024 ** 2)  # MB
         
+        #Measure peak memory?
+        peak_memory = torch.cuda.max_memory_allocated() / (1024 ** 2)
+        
         # Calculate F1 score
         #f1 = f1_score([answers], [response], average="macro")  # Stored f1score function is not appropritate
         f1=compute_f1(answers, response)
         f1_scores.append(f1)
         latencies.append(latency)
         memory_usages.append(memory)
+        peak_memory_usages.append(peak_memory)
 
         # print(f"Response: {response}")
         # print(f"F1 Score: {f1:.4f}, Latency: {latency:.3f}s, Memory: {memory:.2f}MB\n")
@@ -224,7 +230,8 @@ def evaluate(data, compression_func, ratio=None):
     return {
         "avg_f1": np.mean(f1_scores),
         "avg_latency": np.mean(latencies),
-        "avg_memory": np.mean(memory_usages)
+        "avg_memory": np.mean(memory_usages),
+        "avg_peak_memory": np.mean(peak_memory_usages)
     }
 #####################################################################################
 with open("results.txt", "w") as f:
@@ -241,9 +248,9 @@ def log_result(message):
 # Evaluate no pruning (full context)
 full_context_results = evaluate(data, no_pruning)
 print("\n=== No Pruning (Full Context) ===")
-print(f"F1: {full_context_results['avg_f1']:.2f}, Latency: {full_context_results['avg_latency']:.2f}s, Memory: {full_context_results['avg_memory']:.2f} MB")
+print(f"F1: {full_context_results['avg_f1']:.2f}, Latency: {full_context_results['avg_latency']:.2f}s, Memory: {full_context_results['avg_memory']:.2f} MB, Peak Memory: {full_context_results['avg_peak_memory']:.2f} MB")
 log_result("\n=== No Pruning (Full Context) ===")
-log_result(f"F1: {full_context_results['avg_f1']:.2f}, Latency: {full_context_results['avg_latency']:.2f}s, Memory: {full_context_results['avg_memory']:.2f} MB")
+log_result(f"F1: {full_context_results['avg_f1']:.2f}, Latency: {full_context_results['avg_latency']:.2f}s, Memory: {full_context_results['avg_memory']:.2f} MB, Peak Memory: {full_context_results['avg_peak_memory']:.2f} MB")
 
 
 pruning_ratios = [0.1, 0.3, 0.5, 0.7]
@@ -258,23 +265,23 @@ pruning_ratios = [0.1, 0.3, 0.5, 0.7]
 # for ratio in pruning_ratios:
 #     textrank_results = evaluate(data, compress_with_textrank, ratio=ratio)
 #     print(f"\n=== Text Rank Compression ({int(ratio*100)}%) ===")
-#     print(f"F1: {textrank_results['avg_f1']:.2f}, Latency: {textrank_results['avg_latency']:.2f}s, Memory: {textrank_results['avg_memory']:.2f} MB")
+#     print(f"F1: {textrank_results['avg_f1']:.2f}, Latency: {textrank_results['avg_latency']:.2f}s, Memory: {textrank_results['avg_memory']:.2f} MB, Peak Memory: {textrank_results['avg_peak_memory']:.2f} MB")
 #     log_result(f"\n=== Text Rank Compression ({int(ratio*100)}%) ===")
-#     log_result(f"F1: {textrank_results['avg_f1']:.2f}, Latency: {textrank_results['avg_latency']:.2f}s, Memory: {textrank_results['avg_memory']:.2f} MB")
+#     log_result(f"F1: {textrank_results['avg_f1']:.2f}, Latency: {textrank_results['avg_latency']:.2f}s, Memory: {textrank_results['avg_memory']:.2f} MB, Peak Memory: {textrank_results['avg_peak_memory']:.2f} MB")
 
 
 # for ratio in pruning_ratios:
 #     lingua_results = evaluate(data, compress_with_llmlingua, ratio=ratio)
     
 #     print(f"\n=== llmlingua compression ({int(ratio*100)}%) ===")
-#     print(f"F1: {lingua_results['avg_f1']:.2f}, Latency: {lingua_results['avg_latency']:.2f}s, Memory: {lingua_results['avg_memory']:.2f} MB")
+#     print(f"F1: {lingua_results['avg_f1']:.2f}, Latency: {lingua_results['avg_latency']:.2f}s, Memory: {lingua_results['avg_memory']:.2f} MB, Peak Memory: {lingua_results['avg_peak_memory']:.2f} MB")
 #     log_result(f"\n=== llmlingua compression ({int(ratio*100)}%) ===")
-#     log_result(f"F1: {lingua_results['avg_f1']:.2f}, Latency: {lingua_results['avg_latency']:.2f}s, Memory: {lingua_results['avg_memory']:.2f} MB")
+#     log_result(f"F1: {lingua_results['avg_f1']:.2f}, Latency: {lingua_results['avg_latency']:.2f}s, Memory: {lingua_results['avg_memory']:.2f} MB, Peak Memory: {lingua_results['avg_peak_memory']:.2f} MB")
         
 for ratio in pruning_ratios:
     random_pruning_results = evaluate(data, random_prune, ratio=ratio)
     
     print(f"\n=== Random Token Pruning ({int(ratio*100)}%) ===")
-    print(f"F1: {random_pruning_results['avg_f1']:.2f}, Latency: {random_pruning_results['avg_latency']:.2f}s, Memory: {random_pruning_results['avg_memory']:.2f} MB")
+    print(f"F1: {random_pruning_results['avg_f1']:.2f}, Latency: {random_pruning_results['avg_latency']:.2f}s, Memory: {random_pruning_results['avg_memory']:.2f} MB, Peak Memory: {random_pruning_results['avg_peak_memory']:.2f} MB")
     log_result(f"\n=== Random Token Pruning ({int(ratio*100)}%) ===")
-    log_result(f"F1: {random_pruning_results['avg_f1']:.2f}, Latency: {random_pruning_results['avg_latency']:.2f}s, Memory: {random_pruning_results['avg_memory']:.2f} MB")
+    log_result(f"F1: {random_pruning_results['avg_f1']:.2f}, Latency: {random_pruning_results['avg_latency']:.2f}s, Memory: {random_pruning_results['avg_memory']:.2f} MB, Peak Memory: {random_pruning_results['avg_peak_memory']:.2f} MB")
